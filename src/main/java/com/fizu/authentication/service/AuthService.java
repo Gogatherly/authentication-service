@@ -1,7 +1,15 @@
 package com.fizu.authentication.service;
 
-import java.util.Map;
+import com.fizu.authentication.controller.dto.MessageResponse;
+import com.fizu.authentication.controller.dto.RegisterResponse;
+import com.fizu.authentication.controller.dto.TokenResponse;
 
 public interface AuthService {
-    Map<String,String> loginWithGoogle(String idToken);
+    TokenResponse loginWithGoogle(String idToken);
+
+    RegisterResponse registerWithEmail(String email, String password, String username);
+
+    TokenResponse loginWithEmail(String email, String password);
+
+    MessageResponse verifyEmail(String token);
 }

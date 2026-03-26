@@ -26,7 +26,6 @@ public class GoogleServiceImp implements GoogleService {
         GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(transport, jsonFactory)
                 .setAudience(Collections.singletonList(clientId))
                 .build();
-
         try {
             GoogleIdToken idToken = verifier.verify(idTokenString);
             if (idToken != null) {

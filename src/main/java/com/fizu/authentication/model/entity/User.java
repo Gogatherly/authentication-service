@@ -36,6 +36,12 @@ public class User implements UserDetails {
     private String email;
     @Column(name = "password")
     private String password;
+    @Column(name = "email_verified", nullable = false)
+    private boolean emailVerified = false;
+    @Column(name = "email_verification_token")
+    private String emailVerificationToken;
+    @Column(name = "email_verification_token_expiry")
+    private Instant emailVerificationTokenExpiry;
     @Column(name = "username", nullable = false)
     private String username;
     @Id
