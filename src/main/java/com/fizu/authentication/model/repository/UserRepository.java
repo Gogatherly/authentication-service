@@ -1,6 +1,6 @@
-package com.fizu.oauth.model.repository;
+package com.fizu.authentication.model.repository;
 
-import com.fizu.oauth.model.entity.User;
+import com.fizu.authentication.model.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 

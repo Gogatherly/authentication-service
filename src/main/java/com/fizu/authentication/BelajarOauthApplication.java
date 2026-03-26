@@ -1,4 +1,4 @@
-package com.fizu.oauth;
+package com.fizu.authentication;
 
 import io.github.cdimascio.dotenv.Dotenv;
 import org.springframework.boot.SpringApplication;

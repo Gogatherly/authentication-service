@@ -1,18 +1,15 @@
-package com.fizu.oauth.service;
+package com.fizu.authentication.service;
 
-import com.fizu.oauth.model.entity.RefreshToken;
-import com.fizu.oauth.model.entity.User;
-import com.fizu.oauth.model.repository.RefreshTokenRepository;
-import com.fizu.oauth.model.repository.UserRepository;
-import com.fizu.oauth.util.JwtUtil;
+import com.fizu.authentication.model.entity.RefreshToken;
+import com.fizu.authentication.model.entity.User;
+import com.fizu.authentication.model.repository.RefreshTokenRepository;
+import com.fizu.authentication.model.repository.UserRepository;
+import com.fizu.authentication.util.JwtUtil;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
-import lombok.AllArgsConstructor;
-import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.sql.Date;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;

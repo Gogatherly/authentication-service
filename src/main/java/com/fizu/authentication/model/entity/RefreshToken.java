@@ -1,4 +1,4 @@
-package com.fizu.oauth.model.entity;
+package com.fizu.authentication.model.entity;
 
 import jakarta.persistence.*;
 import lombok.Getter;
@@ -6,9 +6,7 @@ import lombok.Setter;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 
-import java.time.Instant;
 import java.time.LocalDate;
-import java.util.Date;
 
 @Getter
 @Setter

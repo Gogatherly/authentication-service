@@ -1,6 +1,6 @@
-package com.fizu.oauth.service;
+package com.fizu.authentication.service;
 
-import com.fizu.oauth.model.repository.UserRepository;
+import com.fizu.authentication.model.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;

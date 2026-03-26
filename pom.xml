@@ -9,10 +9,10 @@
 		<relativePath/> <!-- lookup parent from repository -->
 	</parent>
 	<groupId>com.fizu</groupId>
-	<artifactId>oauth</artifactId>
+	<artifactId>authentication-service</artifactId>
 	<version>0.0.1-SNAPSHOT</version>
 	<name>belajar-oauth</name>
-	<description>belajar oauth</description>
+	<description>authentication service</description>
 	<url/>
 	<licenses>
 		<license/>

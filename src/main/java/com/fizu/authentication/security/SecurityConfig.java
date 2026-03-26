@@ -1,4 +1,4 @@
-package com.fizu.oauth.security;
+package com.fizu.authentication.security;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

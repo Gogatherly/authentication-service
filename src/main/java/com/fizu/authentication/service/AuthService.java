@@ -1,4 +1,4 @@
-package com.fizu.oauth.service;
+package com.fizu.authentication.service;
 
 import java.util.Map;
 
