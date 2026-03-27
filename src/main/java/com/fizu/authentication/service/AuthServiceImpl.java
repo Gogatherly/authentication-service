@@ -3,6 +3,15 @@ package com.fizu.authentication.service;
 import com.fizu.authentication.controller.dto.MessageResponse;
 import com.fizu.authentication.controller.dto.RegisterResponse;
 import com.fizu.authentication.controller.dto.TokenResponse;
+import com.fizu.authentication.exception.EmailAlreadyRegisteredException;
+import com.fizu.authentication.exception.EmailAlreadyVerifiedException;
+import com.fizu.authentication.exception.EmailNotVerifiedException;
+import com.fizu.authentication.exception.GoogleTokenVerificationException;
+import com.fizu.authentication.exception.InvalidCredentialsException;
+import com.fizu.authentication.exception.ProviderMismatchException;
+import com.fizu.authentication.exception.ResourceNotFoundException;
+import com.fizu.authentication.exception.VerificationCodeExpiredException;
+import com.fizu.authentication.exception.VerificationCodeInvalidException;
 import com.fizu.authentication.model.entity.RefreshToken;
 import com.fizu.authentication.model.entity.User;
 import com.fizu.authentication.model.repository.RefreshTokenRepository;
@@ -28,14 +37,15 @@ import java.util.UUID;
 public class AuthServiceImpl implements AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final GoogleService googleService;
-    private JwtUtil jwtUtil;
-    private UserRepository userRepository;
+    private final JwtUtil jwtUtil;
+    private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
     private final SecureRandom secureRandom = new SecureRandom();
+
     AuthServiceImpl(GoogleService googleService, JwtUtil jwtUtil, UserRepository userRepository,
                     RefreshTokenRepository refreshTokenRepository, PasswordEncoder passwordEncoder,
-                    EmailService emailService){
+                    EmailService emailService) {
         this.googleService = googleService;
         this.jwtUtil = jwtUtil;
         this.userRepository = userRepository;
@@ -54,7 +64,7 @@ public class AuthServiceImpl implements AuthService {
     public TokenResponse loginWithGoogle(String idToken) {
         GoogleIdToken.Payload payload = googleService.verify(idToken);
         if (payload == null) {
-            throw new RuntimeException("Invalid ID Token");
+            throw new GoogleTokenVerificationException("Invalid ID token");
         }
         String email = payload.getEmail();
         String name = (String) payload.get("name");
@@ -74,12 +84,8 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public RegisterResponse registerWithEmail(String email, String password, String username) {
-        validateEmailPassword(email, password);
-        if (username == null || username.isBlank()) {
-            throw new IllegalArgumentException("Username is required");
-        }
         if (userRepository.findByEmail(email).isPresent()) {
-            throw new RuntimeException("Email already registered");
+            throw new EmailAlreadyRegisteredException("Email already registered");
         }
 
         User user = new User();
@@ -100,18 +106,17 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public TokenResponse loginWithEmail(String email, String password) {
-        validateEmailPassword(email, password);
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Invalid email or password"));
+                .orElseThrow(() -> new InvalidCredentialsException("Invalid email or password"));
 
         if (user.getProvider() != null && !"email".equals(user.getProvider())) {
-            throw new RuntimeException("Use the provider linked to this account");
+            throw new ProviderMismatchException("Use the provider linked to this account");
         }
         if (user.getPassword() == null || !passwordEncoder.matches(password, user.getPassword())) {
-            throw new RuntimeException("Invalid email or password");
+            throw new InvalidCredentialsException("Invalid email or password");
         }
         if (!user.isEmailVerified()) {
-            throw new RuntimeException("Email not verified");
+            throw new EmailNotVerifiedException("Email not verified");
         }
 
         return issueTokens(user);
@@ -119,25 +124,20 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public MessageResponse verifyEmail(String email, String code) {
-        validateEmail(email);
-        if (code == null || code.isBlank()) {
-            throw new IllegalArgumentException("Verification code is required");
-        }
-
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Email not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Email not found"));
 
         if (user.isEmailVerified()) {
-            return new MessageResponse("Email already verified");
+            throw new EmailAlreadyVerifiedException("Email already verified");
         }
 
         if (user.getEmailVerificationCode() == null || !user.getEmailVerificationCode().equals(code)) {
-            throw new RuntimeException("Invalid verification code");
+            throw new VerificationCodeInvalidException("Invalid verification code");
         }
 
         Instant expiry = user.getEmailVerificationCodeExpiry();
         if (expiry == null || Instant.now().isAfter(expiry)) {
-            throw new RuntimeException("Verification code expired");
+            throw new VerificationCodeExpiredException("Verification code expired");
         }
 
         user.setEmailVerified(true);
@@ -150,12 +150,11 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public RegisterResponse resendVerificationCode(String email) {
-        validateEmail(email);
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Email not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Email not found"));
 
         if (user.isEmailVerified()) {
-            throw new RuntimeException("Email already verified");
+            throw new EmailAlreadyVerifiedException("Email already verified");
         }
 
         String verificationCode = generateVerificationCode();
@@ -169,17 +168,14 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public MessageResponse changeUnverifiedEmail(String currentEmail, String newEmail) {
-        validateEmail(currentEmail);
-        validateEmail(newEmail);
-
         User user = userRepository.findByEmail(currentEmail)
-                .orElseThrow(() -> new RuntimeException("Current email not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Current email not found"));
 
         if (user.isEmailVerified()) {
-            throw new RuntimeException("Email already verified");
+            throw new EmailAlreadyVerifiedException("Email already verified");
         }
         if (userRepository.findByEmail(newEmail).isPresent()) {
-            throw new RuntimeException("New email already registered");
+            throw new EmailAlreadyRegisteredException("New email already registered");
         }
 
         user.setEmail(newEmail);
@@ -202,19 +198,6 @@ public class AuthServiceImpl implements AuthService {
         refreshTokenRepository.save(refreshToken);
 
         return new TokenResponse(token, refreshToken.getToken());
-    }
-
-    private void validateEmailPassword(String email, String password) {
-        validateEmail(email);
-        if (password == null || password.isBlank()) {
-            throw new IllegalArgumentException("Password is required");
-        }
-    }
-
-    private void validateEmail(String email) {
-        if (email == null || email.isBlank()) {
-            throw new IllegalArgumentException("Email is required");
-        }
     }
 
     private String generateVerificationCode() {
