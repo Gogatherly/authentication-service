@@ -1,5 +1,6 @@
 package com.fizu.authentication.service;
 
+import com.fizu.authentication.exception.GoogleTokenVerificationException;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdTokenVerifier;
 import com.google.api.client.http.javanet.NetHttpTransport;
@@ -32,7 +33,7 @@ public class GoogleServiceImp implements GoogleService {
                 return idToken.getPayload();
             }
         } catch (GeneralSecurityException | IOException e) {
-            throw new RuntimeException("Failed to verify Google ID Token", e);
+            throw new GoogleTokenVerificationException("Failed to verify Google ID token", e);
         }
         return null;
     }

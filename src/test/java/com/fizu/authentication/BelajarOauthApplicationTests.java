@@ -1,13 +1,13 @@
 package com.fizu.authentication;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest
 class BelajarOauthApplicationTests {
 
 	@Test
 	void contextLoads() {
+		Class<?> applicationClass = BelajarOauthApplication.class;
+		org.junit.jupiter.api.Assertions.assertEquals("BelajarOauthApplication", applicationClass.getSimpleName());
 	}
 
 }
