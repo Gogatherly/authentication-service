@@ -11,5 +11,9 @@ public interface AuthService {
 
     TokenResponse loginWithEmail(String email, String password);
 
-    MessageResponse verifyEmail(String token);
+    MessageResponse verifyEmail(String email, String code);
+
+    RegisterResponse resendVerificationCode(String email);
+
+    MessageResponse changeUnverifiedEmail(String currentEmail, String newEmail);
 }

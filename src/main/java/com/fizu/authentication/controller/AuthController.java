@@ -1,9 +1,11 @@
 package com.fizu.authentication.controller;
 
+import com.fizu.authentication.controller.dto.ChangeEmailRequest;
 import com.fizu.authentication.controller.dto.EmailLoginRequest;
 import com.fizu.authentication.controller.dto.EmailRegisterRequest;
 import com.fizu.authentication.controller.dto.MessageResponse;
 import com.fizu.authentication.controller.dto.RegisterResponse;
+import com.fizu.authentication.controller.dto.ResendVerificationRequest;
 import com.fizu.authentication.controller.dto.TokenResponse;
 import com.fizu.authentication.controller.dto.VerifyEmailRequest;
 import com.fizu.authentication.service.AuthService;
@@ -43,7 +45,19 @@ public class AuthController {
 
     @PostMapping("/auth/email/verify")
     public org.springframework.http.ResponseEntity<MessageResponse> verifyEmail(@RequestBody VerifyEmailRequest request) {
-        MessageResponse response = authService.verifyEmail(request.token());
+        MessageResponse response = authService.verifyEmail(request.email(), request.code());
+        return org.springframework.http.ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/auth/email/resend")
+    public org.springframework.http.ResponseEntity<RegisterResponse> resendVerificationCode(@RequestBody ResendVerificationRequest request) {
+        RegisterResponse response = authService.resendVerificationCode(request.email());
+        return org.springframework.http.ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/auth/email/change")
+    public org.springframework.http.ResponseEntity<MessageResponse> changeUnverifiedEmail(@RequestBody ChangeEmailRequest request) {
+        MessageResponse response = authService.changeUnverifiedEmail(request.currentEmail(), request.newEmail());
         return org.springframework.http.ResponseEntity.ok(response);
     }
 }
