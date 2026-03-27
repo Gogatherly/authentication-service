@@ -38,10 +38,10 @@ public class User implements UserDetails {
     private String password;
     @Column(name = "email_verified", nullable = false)
     private boolean emailVerified = false;
-    @Column(name = "email_verification_token")
-    private String emailVerificationToken;
-    @Column(name = "email_verification_token_expiry")
-    private Instant emailVerificationTokenExpiry;
+    @Column(name = "email_verification_code", length = 6)
+    private String emailVerificationCode;
+    @Column(name = "email_verification_code_expiry")
+    private Instant emailVerificationCodeExpiry;
     @Column(name = "username", nullable = false)
     private String username;
     @Id

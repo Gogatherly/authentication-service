@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -30,20 +31,24 @@ public class AuthServiceImpl implements AuthService {
     private JwtUtil jwtUtil;
     private UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final EmailService emailService;
+    private final SecureRandom secureRandom = new SecureRandom();
     AuthServiceImpl(GoogleService googleService, JwtUtil jwtUtil, UserRepository userRepository,
-                    RefreshTokenRepository refreshTokenRepository, PasswordEncoder passwordEncoder){
+                    RefreshTokenRepository refreshTokenRepository, PasswordEncoder passwordEncoder,
+                    EmailService emailService){
         this.googleService = googleService;
         this.jwtUtil = jwtUtil;
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.passwordEncoder = passwordEncoder;
+        this.emailService = emailService;
     }
 
     @Value("${REFRESH_TOKEN_EXPIRATION}")
     private long refreshTokenExpiration;
 
-    @Value("${EMAIL_VERIFICATION_EXPIRATION_DAYS:1}")
-    private long emailVerificationExpirationDays;
+    @Value("${EMAIL_VERIFICATION_EXPIRATION_MINUTES:10}")
+    private long emailVerificationExpirationMinutes;
 
     @Override
     public TokenResponse loginWithGoogle(String idToken) {
@@ -84,12 +89,13 @@ public class AuthServiceImpl implements AuthService {
         user.setPassword(passwordEncoder.encode(password));
         user.setEmailVerified(false);
 
-        String verificationToken = UUID.randomUUID().toString();
-        user.setEmailVerificationToken(verificationToken);
-        user.setEmailVerificationTokenExpiry(Instant.now().plus(Duration.ofDays(emailVerificationExpirationDays)));
+        String verificationCode = generateVerificationCode();
+        user.setEmailVerificationCode(verificationCode);
+        user.setEmailVerificationCodeExpiry(Instant.now().plus(Duration.ofMinutes(emailVerificationExpirationMinutes)));
 
         userRepository.save(user);
-        return new RegisterResponse("Verification token created", verificationToken);
+        emailService.sendVerificationCode(email, verificationCode);
+        return new RegisterResponse("Verification code created");
     }
 
     @Override
@@ -112,24 +118,79 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
-    public MessageResponse verifyEmail(String token) {
-        if (token == null || token.isBlank()) {
-            throw new IllegalArgumentException("Verification token is required");
+    public MessageResponse verifyEmail(String email, String code) {
+        validateEmail(email);
+        if (code == null || code.isBlank()) {
+            throw new IllegalArgumentException("Verification code is required");
         }
-        User user = userRepository.findByEmailVerificationToken(token)
-                .orElseThrow(() -> new RuntimeException("Invalid verification token"));
 
-        Instant expiry = user.getEmailVerificationTokenExpiry();
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Email not found"));
+
+        if (user.isEmailVerified()) {
+            return new MessageResponse("Email already verified");
+        }
+
+        if (user.getEmailVerificationCode() == null || !user.getEmailVerificationCode().equals(code)) {
+            throw new RuntimeException("Invalid verification code");
+        }
+
+        Instant expiry = user.getEmailVerificationCodeExpiry();
         if (expiry == null || Instant.now().isAfter(expiry)) {
-            throw new RuntimeException("Verification token expired");
+            throw new RuntimeException("Verification code expired");
         }
 
         user.setEmailVerified(true);
-        user.setEmailVerificationToken(null);
-        user.setEmailVerificationTokenExpiry(null);
+        user.setEmailVerificationCode(null);
+        user.setEmailVerificationCodeExpiry(null);
         userRepository.save(user);
 
         return new MessageResponse("Email verified");
+    }
+
+    @Override
+    public RegisterResponse resendVerificationCode(String email) {
+        validateEmail(email);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("Email not found"));
+
+        if (user.isEmailVerified()) {
+            throw new RuntimeException("Email already verified");
+        }
+
+        String verificationCode = generateVerificationCode();
+        user.setEmailVerificationCode(verificationCode);
+        user.setEmailVerificationCodeExpiry(Instant.now().plus(Duration.ofMinutes(emailVerificationExpirationMinutes)));
+        userRepository.save(user);
+
+        emailService.sendVerificationCode(email, verificationCode);
+        return new RegisterResponse("Verification code resent");
+    }
+
+    @Override
+    public MessageResponse changeUnverifiedEmail(String currentEmail, String newEmail) {
+        validateEmail(currentEmail);
+        validateEmail(newEmail);
+
+        User user = userRepository.findByEmail(currentEmail)
+                .orElseThrow(() -> new RuntimeException("Current email not found"));
+
+        if (user.isEmailVerified()) {
+            throw new RuntimeException("Email already verified");
+        }
+        if (userRepository.findByEmail(newEmail).isPresent()) {
+            throw new RuntimeException("New email already registered");
+        }
+
+        user.setEmail(newEmail);
+        user.setEmailVerified(false);
+        String verificationCode = generateVerificationCode();
+        user.setEmailVerificationCode(verificationCode);
+        user.setEmailVerificationCodeExpiry(Instant.now().plus(Duration.ofMinutes(emailVerificationExpirationMinutes)));
+        userRepository.save(user);
+
+        emailService.sendVerificationCode(newEmail, verificationCode);
+        return new MessageResponse("Email updated and verification code sent");
     }
 
     private TokenResponse issueTokens(User user) {
@@ -144,11 +205,20 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private void validateEmailPassword(String email, String password) {
-        if (email == null || email.isBlank()) {
-            throw new IllegalArgumentException("Email is required");
-        }
+        validateEmail(email);
         if (password == null || password.isBlank()) {
             throw new IllegalArgumentException("Password is required");
         }
+    }
+
+    private void validateEmail(String email) {
+        if (email == null || email.isBlank()) {
+            throw new IllegalArgumentException("Email is required");
+        }
+    }
+
+    private String generateVerificationCode() {
+        int code = secureRandom.nextInt(1_000_000);
+        return String.format("%06d", code);
     }
 }
