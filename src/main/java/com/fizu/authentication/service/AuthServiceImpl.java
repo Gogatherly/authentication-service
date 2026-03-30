@@ -1,5 +1,6 @@
 package com.fizu.authentication.service;
 
+import com.fizu.authentication.controller.dto.AccessTokenResponse;
 import com.fizu.authentication.controller.dto.MessageResponse;
 import com.fizu.authentication.controller.dto.RegisterResponse;
 import com.fizu.authentication.controller.dto.TokenResponse;
@@ -8,6 +9,7 @@ import com.fizu.authentication.exception.EmailAlreadyVerifiedException;
 import com.fizu.authentication.exception.EmailNotVerifiedException;
 import com.fizu.authentication.exception.GoogleTokenVerificationException;
 import com.fizu.authentication.exception.InvalidCredentialsException;
+import com.fizu.authentication.exception.InvalidRefreshTokenException;
 import com.fizu.authentication.exception.ProviderMismatchException;
 import com.fizu.authentication.exception.ResourceNotFoundException;
 import com.fizu.authentication.exception.VerificationCodeExpiredException;
@@ -22,10 +24,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
@@ -187,6 +191,29 @@ public class AuthServiceImpl implements AuthService {
 
         emailService.sendVerificationCode(newEmail, verificationCode);
         return new MessageResponse("Email updated and verification code sent");
+    }
+
+    @Override
+    @Transactional
+    public MessageResponse logout(String refreshToken) {
+        refreshTokenRepository.findByToken(refreshToken)
+                .ifPresent(refreshTokenRepository::delete);
+        return new MessageResponse("Logout successful");
+    }
+
+    @Override
+    @Transactional
+    public AccessTokenResponse refreshAccessToken(String refreshToken) {
+        RefreshToken storedToken = refreshTokenRepository.findByToken(refreshToken)
+                .orElseThrow(() -> new InvalidRefreshTokenException("Invalid or expired refresh token"));
+
+        if (storedToken.getExpiryDate().isBefore(LocalDate.now())) {
+            refreshTokenRepository.delete(storedToken);
+            throw new InvalidRefreshTokenException("Invalid or expired refresh token");
+        }
+
+        String accessToken = jwtUtil.generateToken(storedToken.getUser().getEmail());
+        return new AccessTokenResponse(accessToken);
     }
 
     private TokenResponse issueTokens(User user) {

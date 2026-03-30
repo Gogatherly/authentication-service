@@ -1,11 +1,14 @@
 package com.fizu.authentication.controller;
 
+import com.fizu.authentication.controller.dto.AccessTokenResponse;
 import com.fizu.authentication.controller.dto.ApiSuccessResponse;
 import com.fizu.authentication.controller.dto.ChangeEmailRequest;
 import com.fizu.authentication.controller.dto.EmailLoginRequest;
 import com.fizu.authentication.controller.dto.EmailRegisterRequest;
 import com.fizu.authentication.controller.dto.GoogleLoginRequest;
+import com.fizu.authentication.controller.dto.LogoutRequest;
 import com.fizu.authentication.controller.dto.MessageResponse;
+import com.fizu.authentication.controller.dto.RefreshTokenRequest;
 import com.fizu.authentication.controller.dto.RegisterResponse;
 import com.fizu.authentication.controller.dto.ResendVerificationRequest;
 import com.fizu.authentication.controller.dto.TokenResponse;
@@ -62,5 +65,17 @@ public class AuthController {
     public ResponseEntity<ApiSuccessResponse<MessageResponse>> changeUnverifiedEmail(@Valid @RequestBody ChangeEmailRequest request) {
         MessageResponse response = authService.changeUnverifiedEmail(request.currentEmail(), request.newEmail());
         return ResponseEntity.ok(ApiSuccessResponse.of(response.message(), response));
+    }
+
+    @PostMapping("/auth/logout")
+    public ResponseEntity<ApiSuccessResponse<MessageResponse>> logout(@Valid @RequestBody LogoutRequest request) {
+        MessageResponse response = authService.logout(request.refreshToken());
+        return ResponseEntity.ok(ApiSuccessResponse.of(response.message(), response));
+    }
+
+    @PostMapping("/auth/refresh")
+    public ResponseEntity<ApiSuccessResponse<AccessTokenResponse>> refreshAccessToken(@Valid @RequestBody RefreshTokenRequest request) {
+        AccessTokenResponse response = authService.refreshAccessToken(request.refreshToken());
+        return ResponseEntity.ok(ApiSuccessResponse.of("Token refreshed successfully", response));
     }
 }

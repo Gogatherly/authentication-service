@@ -1,5 +1,6 @@
 package com.fizu.authentication.service;
 
+import com.fizu.authentication.controller.dto.AccessTokenResponse;
 import com.fizu.authentication.controller.dto.MessageResponse;
 import com.fizu.authentication.controller.dto.RegisterResponse;
 import com.fizu.authentication.controller.dto.TokenResponse;
@@ -16,4 +17,8 @@ public interface AuthService {
     RegisterResponse resendVerificationCode(String email);
 
     MessageResponse changeUnverifiedEmail(String currentEmail, String newEmail);
+
+    MessageResponse logout(String refreshToken);
+
+    AccessTokenResponse refreshAccessToken(String refreshToken);
 }
