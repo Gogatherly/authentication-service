@@ -1,10 +1,13 @@
 package com.fizu.authentication.controller;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fizu.authentication.controller.dto.AccessTokenResponse;
+import com.fizu.authentication.controller.dto.MessageResponse;
 import com.fizu.authentication.controller.dto.RegisterResponse;
 import com.fizu.authentication.exception.EmailAlreadyRegisteredException;
 import com.fizu.authentication.exception.EmailNotVerifiedException;
 import com.fizu.authentication.exception.GlobalExceptionHandler;
+import com.fizu.authentication.exception.InvalidRefreshTokenException;
 import com.fizu.authentication.exception.VerificationCodeInvalidException;
 import com.fizu.authentication.service.AuthService;
 import org.junit.jupiter.api.BeforeEach;
@@ -140,5 +143,79 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.status").value("error"))
                 .andExpect(jsonPath("$.message").value("Validation failed"))
                 .andExpect(jsonPath("$.errors.idToken").value("must not be blank"));
+    }
+
+    @Test
+    void logoutReturnsWrappedSuccessResponse() throws Exception {
+        when(authService.logout(eq("refresh-token")))
+                .thenReturn(new MessageResponse("Logout successful"));
+
+        mockMvc.perform(post("/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "refreshToken", "refresh-token"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("success"))
+                .andExpect(jsonPath("$.message").value("Logout successful"))
+                .andExpect(jsonPath("$.data.message").value("Logout successful"));
+    }
+
+    @Test
+    void logoutReturnsValidationErrorsWhenRefreshTokenBlank() throws Exception {
+        mockMvc.perform(post("/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "refreshToken", ""
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value("error"))
+                .andExpect(jsonPath("$.message").value("Validation failed"))
+                .andExpect(jsonPath("$.errors.refreshToken").value("must not be blank"));
+    }
+
+    @Test
+    void refreshReturnsWrappedSuccessResponse() throws Exception {
+        when(authService.refreshAccessToken(eq("refresh-token")))
+                .thenReturn(new AccessTokenResponse("new-access-token"));
+
+        mockMvc.perform(post("/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "refreshToken", "refresh-token"
+                        ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("success"))
+                .andExpect(jsonPath("$.message").value("Token refreshed successfully"))
+                .andExpect(jsonPath("$.data.token").value("new-access-token"));
+    }
+
+    @Test
+    void refreshReturnsValidationErrorsWhenRefreshTokenBlank() throws Exception {
+        mockMvc.perform(post("/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "refreshToken", ""
+                        ))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.status").value("error"))
+                .andExpect(jsonPath("$.message").value("Validation failed"))
+                .andExpect(jsonPath("$.errors.refreshToken").value("must not be blank"));
+    }
+
+    @Test
+    void refreshReturnsUnauthorizedWhenRefreshTokenInvalid() throws Exception {
+        when(authService.refreshAccessToken(eq("refresh-token")))
+                .thenThrow(new InvalidRefreshTokenException("Invalid or expired refresh token"));
+
+        mockMvc.perform(post("/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(Map.of(
+                                "refreshToken", "refresh-token"
+                        ))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.status").value("error"))
+                .andExpect(jsonPath("$.message").value("Invalid or expired refresh token"))
+                .andExpect(jsonPath("$.errors").value(nullValue()));
     }
 }

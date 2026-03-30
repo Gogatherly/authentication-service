@@ -45,6 +45,11 @@ public class GlobalExceptionHandler {
         return buildErrorResponse(HttpStatus.UNAUTHORIZED, exception.getMessage(), null);
     }
 
+    @ExceptionHandler(InvalidRefreshTokenException.class)
+    public ResponseEntity<ApiErrorResponse> handleInvalidRefreshToken(InvalidRefreshTokenException exception) {
+        return buildErrorResponse(HttpStatus.UNAUTHORIZED, exception.getMessage(), null);
+    }
+
     @ExceptionHandler(ProviderMismatchException.class)
     public ResponseEntity<ApiErrorResponse> handleProviderMismatch(ProviderMismatchException exception) {
         return buildErrorResponse(HttpStatus.CONFLICT, exception.getMessage(), null);
