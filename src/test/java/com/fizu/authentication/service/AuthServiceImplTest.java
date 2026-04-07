@@ -10,12 +10,18 @@ import com.fizu.authentication.model.repository.UserRepository;
 import com.fizu.authentication.util.JwtUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import java.time.LocalDate;
+import java.time.Instant;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -26,18 +32,21 @@ import static org.mockito.Mockito.when;
 
 class AuthServiceImplTest {
 
+    private UserRepository userRepository;
     private RefreshTokenRepository refreshTokenRepository;
     private JwtUtil jwtUtil;
+    private PasswordEncoder passwordEncoder;
+    private EmailService emailService;
     private AuthServiceImpl authService;
 
     @BeforeEach
     void setUp() {
         GoogleService googleService = mock(GoogleService.class);
         jwtUtil = mock(JwtUtil.class);
-        UserRepository userRepository = mock(UserRepository.class);
+        userRepository = mock(UserRepository.class);
         refreshTokenRepository = mock(RefreshTokenRepository.class);
-        PasswordEncoder passwordEncoder = mock(PasswordEncoder.class);
-        EmailService emailService = mock(EmailService.class);
+        passwordEncoder = mock(PasswordEncoder.class);
+        emailService = mock(EmailService.class);
 
         authService = new AuthServiceImpl(
                 googleService,
@@ -47,6 +56,84 @@ class AuthServiceImplTest {
                 passwordEncoder,
                 emailService
         );
+        ReflectionTestUtils.setField(authService, "emailVerificationExpirationMinutes", 10L);
+        ReflectionTestUtils.setField(authService, "refreshTokenExpiration", 7L);
+    }
+
+    @Test
+    void registerWithEmailCreatesVerificationCodeAndPublishesMessage() {
+        when(userRepository.findByEmail(eq("user@example.com"))).thenReturn(Optional.empty());
+        when(passwordEncoder.encode(eq("password123"))).thenReturn("encoded-password");
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = authService.registerWithEmail("user@example.com", "password123", "username");
+
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(userCaptor.capture());
+        ArgumentCaptor<String> codeCaptor = ArgumentCaptor.forClass(String.class);
+        verify(emailService).sendVerificationCode(eq("user@example.com"), codeCaptor.capture());
+
+        User savedUser = userCaptor.getValue();
+        assertEquals("Verification code created", response.message());
+        assertEquals("user@example.com", savedUser.getEmail());
+        assertEquals("encoded-password", savedUser.getPassword());
+        assertFalse(savedUser.isEmailVerified());
+        assertNotNull(savedUser.getEmailVerificationCodeExpiry());
+        assertTrue(savedUser.getEmailVerificationCodeExpiry().isAfter(Instant.now()));
+        assertNotNull(codeCaptor.getValue());
+        assertTrue(codeCaptor.getValue().matches("\\d{6}"));
+    }
+
+    @Test
+    void resendVerificationCodePublishesNewCode() {
+        User user = new User();
+        user.setEmail("user@example.com");
+        user.setEmailVerified(false);
+        user.setEmailVerificationCode("111111");
+        user.setEmailVerificationCodeExpiry(Instant.now().minusSeconds(60));
+
+        when(userRepository.findByEmail(eq("user@example.com"))).thenReturn(Optional.of(user));
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = authService.resendVerificationCode("user@example.com");
+
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(userCaptor.capture());
+        ArgumentCaptor<String> codeCaptor = ArgumentCaptor.forClass(String.class);
+        verify(emailService).sendVerificationCode(eq("user@example.com"), codeCaptor.capture());
+
+        User savedUser = userCaptor.getValue();
+        assertEquals("Verification code resent", response.message());
+        assertNotNull(savedUser.getEmailVerificationCodeExpiry());
+        assertTrue(savedUser.getEmailVerificationCodeExpiry().isAfter(Instant.now()));
+        assertNotNull(codeCaptor.getValue());
+        assertTrue(codeCaptor.getValue().matches("\\d{6}"));
+    }
+
+    @Test
+    void changeUnverifiedEmailPublishesCodeToNewEmail() {
+        User user = new User();
+        user.setEmail("current@example.com");
+        user.setUsername("username");
+        user.setEmailVerified(false);
+
+        when(userRepository.findByEmail(eq("current@example.com"))).thenReturn(Optional.of(user));
+        when(userRepository.findByEmail(eq("new@example.com"))).thenReturn(Optional.empty());
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        var response = authService.changeUnverifiedEmail("current@example.com", "new@example.com");
+
+        ArgumentCaptor<User> userCaptor = ArgumentCaptor.forClass(User.class);
+        verify(userRepository).save(userCaptor.capture());
+        ArgumentCaptor<String> codeCaptor = ArgumentCaptor.forClass(String.class);
+        verify(emailService).sendVerificationCode(eq("new@example.com"), codeCaptor.capture());
+
+        User savedUser = userCaptor.getValue();
+        assertEquals("Email updated and verification code sent", response.message());
+        assertEquals("new@example.com", savedUser.getEmail());
+        assertFalse(savedUser.isEmailVerified());
+        assertNotNull(codeCaptor.getValue());
+        assertTrue(codeCaptor.getValue().matches("\\d{6}"));
     }
 
     @Test
